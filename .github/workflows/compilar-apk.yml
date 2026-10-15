@@ -1,9 +1,8 @@
-name: Compilar LuxCam Pro 5.2 - LUTs Camera2
+name: Compilar LuxCam Pro 5.2.1 Seguro
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -11,9 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-
     steps:
-      - name: Obtener archivos
+      - name: Obtener codigo
         uses: actions/checkout@v4
 
       - name: Configurar Java 17
@@ -22,63 +20,65 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Preparar Gradle 8.9
+      - name: Preparar Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Instalar herramientas Android
+      - name: Configurar Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Instalar plataforma de Android 14
+      - name: Instalar Android 14
         run: sdkmanager --install 'platforms;android-34' 'build-tools;35.0.0'
 
-      - name: Extraer proyecto completo 5.2
+      - name: Extraer fuente COMPLETA de LuxCam seguro
         shell: bash
         run: |
           set -euo pipefail
-          test -f LuxCam_Pro_5_2_PROYECTO_PARA_GITHUB.zip
-          unzip -oq LuxCam_Pro_5_2_PROYECTO_PARA_GITHUB.zip -d .
-          test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxCamActivity.java
-          test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxToneCurves.java
-          test -f Camera2Diagnostico/checks/LuxToneCurvesCheck.java
+          test -f LuxCam_Pro_5_2_1_PROYECTO_COMPLETO.zip
+          unzip -oq LuxCam_Pro_5_2_1_PROYECTO_COMPLETO.zip -d .
+          test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxSmartPhoto.java
+          test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxColorMath.java
 
-      - name: Validar interfaz sin el antiguo crash TextureView
+      - name: Validar visor y modos fotografias seguros
         shell: bash
         run: |
-          python3 - <<'PYXML'
-          import xml.etree.ElementTree as ET
+          python3 - <<'PYTEST'
           from pathlib import Path
-          android_bg = '{http://schemas.android.com/apk/res/android}background'
-          for folder in ('layout', 'layout-land'):
-              path = Path('Camera2Diagnostico/app/src/main/res') / folder / 'activity_luxcam_studio.xml'
-              root = ET.parse(path).getroot()
-              previews = [v for v in root.iter() if v.tag == 'TextureView']
-              assert len(previews) == 1 and android_bg not in previews[0].attrib, path
-              print('OK visor XML', path)
-          PYXML
+          import xml.etree.ElementTree as ET
+          root=Path('Camera2Diagnostico')
+          s=(root/'app/src/main/java/com/altoke/camera2diagnostico/LuxCamActivity.java').read_text()
+          assert 'b.set(CaptureRequest.TONEMAP_CURVE' not in s
+          assert 'LuxSmartPhoto.enhance' in s
+          ns='{http://schemas.android.com/apk/res/android}background'
+          for folder in ['layout','layout-land']:
+              p=root/'app/src/main/res'/folder/'activity_luxcam_studio.xml'
+              v=[x for x in ET.parse(p).getroot().iter() if x.tag == 'TextureView']
+              assert len(v)==1 and ns not in v[0].attrib
+          print('OK: sin curvas ISP oscuras ni background TextureView')
+          PYTEST
 
-      - name: Pruebas de curvas LUT y orientación Java
+      - name: Pruebas Java de color y orientacion
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/luxcam-tests"
-          javac -encoding UTF-8 -d "$RUNNER_TEMP/luxcam-tests" \
-            Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxToneCurves.java \
+          mkdir -p "$RUNNER_TEMP/luxcam-jvm"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/luxcam-jvm" \
+            Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxColorMath.java \
+            Camera2Diagnostico/checks/LuxColorMathCheck.java \
             Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/OrientationMath.java \
-            Camera2Diagnostico/checks/LuxToneCurvesCheck.java \
             Camera2Diagnostico/checks/OrientationMathCheck.java
-          java -cp "$RUNNER_TEMP/luxcam-tests" com.altoke.camera2diagnostico.LuxToneCurvesCheck
-          java -cp "$RUNNER_TEMP/luxcam-tests" com.altoke.camera2diagnostico.OrientationMathCheck
+          java -cp "$RUNNER_TEMP/luxcam-jvm" com.altoke.camera2diagnostico.LuxColorMathCheck
+          java -cp "$RUNNER_TEMP/luxcam-jvm" com.altoke.camera2diagnostico.OrientationMathCheck
 
-      - name: Compilar APK Android
+      - name: Compilar APK
         working-directory: Camera2Diagnostico
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
-      - name: Publicar APK instalable
+      - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
-          name: LuxCam-Pro-5.2-BETA-APK
+          name: LuxCam-Pro-5.2.1-Seguro-APK
           path: Camera2Diagnostico/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
