@@ -1,5 +1,5 @@
 
-name: Compilar APK diagnostico Camera2
+name: Compilar APK LuxCam Pro
 
 on:
   push:
@@ -34,6 +34,9 @@ jobs:
       - name: Instalar SDK Android
         run: sdkmanager --install "platforms;android-34" "build-tools;35.0.0"
 
+      - name: Aplicar fuente LuxCam Pro v3
+        run: unzip -o LuxCam_Pro_v3_BUNDLE_PARA_REPOSITORIO.zip -d .
+
       - name: Compilar APK
         working-directory: Camera2Diagnostico
         run: gradle :app:assembleDebug --stacktrace
@@ -41,7 +44,7 @@ jobs:
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
-          name: Camera2Diagnostico-Fase1-APK
+          name: LuxCam-Pro-v3-APK
           path: Camera2Diagnostico/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
