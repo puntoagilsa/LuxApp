@@ -7,11 +7,11 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId 'com.altoke.camera2diagnostico'
-        minSdk 26
+        applicationId 'com.altoke.luxcam'
+        minSdk 29
         targetSdk 34
         versionCode 1
-        versionName '1.0-fase1'
+        versionName '2.0-pruebas-camera2'
     }
 
     compileOptions {
