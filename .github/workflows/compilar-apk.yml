@@ -1,4 +1,4 @@
-name: Compilar LuxCam Pro 5.2.1 Seguro
+name: LuxCam Pro 5.2.2 - Corregir espejo frontal
 
 on:
   push:
@@ -11,10 +11,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Obtener codigo
+      - name: Descargar repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Java 17
+      - name: Preparar Java 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -25,51 +25,55 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Configurar Android SDK
+      - name: Preparar Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Instalar Android 14
+      - name: Instalar SDK Android 14
         run: sdkmanager --install 'platforms;android-34' 'build-tools;35.0.0'
 
-      - name: Extraer fuente COMPLETA de LuxCam seguro
+      - name: Extraer LuxCam completo
         shell: bash
         run: |
           set -euo pipefail
-          test -f LuxCam_Pro_5_2_1_PROYECTO_COMPLETO.zip
-          unzip -oq LuxCam_Pro_5_2_1_PROYECTO_COMPLETO.zip -d .
-          test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxSmartPhoto.java
-          test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxColorMath.java
+          test -f LuxCam_Pro_5_2_2_SIN_ESPEJO.zip
+          unzip -oq LuxCam_Pro_5_2_2_SIN_ESPEJO.zip -d .
+          test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxCamActivity.java
+          test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/OrientationMath.java
 
-      - name: Validar visor y modos fotografias seguros
+      - name: Verificar correccion de vista previa sin espejo
         shell: bash
         run: |
+          set -euo pipefail
           python3 - <<'PYTEST'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          root=Path('Camera2Diagnostico')
-          s=(root/'app/src/main/java/com/altoke/camera2diagnostico/LuxCamActivity.java').read_text()
-          assert 'b.set(CaptureRequest.TONEMAP_CURVE' not in s
-          assert 'LuxSmartPhoto.enhance' in s
-          ns='{http://schemas.android.com/apk/res/android}background'
-          for folder in ['layout','layout-land']:
-              p=root/'app/src/main/res'/folder/'activity_luxcam_studio.xml'
-              v=[x for x in ET.parse(p).getroot().iter() if x.tag == 'TextureView']
-              assert len(v)==1 and ns not in v[0].attrib
-          print('OK: sin curvas ISP oscuras ni background TextureView')
+          root = Path('Camera2Diagnostico')
+          java = (root/'app/src/main/java/com/altoke/camera2diagnostico/LuxCamActivity.java').read_text(encoding='utf-8')
+          gradle = (root/'app/build.gradle').read_text(encoding='utf-8')
+          assert 'if (front) matrix.postScale(-1f, 1f, cx, cy);' not in java
+          assert 'textureView.setTransform(matrix)' in java
+          assert 'photo.set(CaptureRequest.JPEG_ORIENTATION, jpegOrientation());' in java
+          assert 'beta522' in gradle
+          ns = '{http://schemas.android.com/apk/res/android}background'
+          for name in ('layout','layout-land'):
+            layout = root/'app/src/main/res'/name/'activity_luxcam_studio.xml'
+            textures = [x for x in ET.parse(layout).getroot().iter() if x.tag == 'TextureView']
+            assert len(textures) == 1 and ns not in textures[0].attrib
+          print('Verificacion OK: frontal sin espejo artificial; XML y orientacion de JPEG conservados')
           PYTEST
 
-      - name: Pruebas Java de color y orientacion
+      - name: Pruebas Java
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/luxcam-jvm"
-          javac -encoding UTF-8 -d "$RUNNER_TEMP/luxcam-jvm" \
-            Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxColorMath.java \
-            Camera2Diagnostico/checks/LuxColorMathCheck.java \
+          mkdir -p "$RUNNER_TEMP/luxcam-tests"
+          javac -encoding UTF-8 -d "$RUNNER_TEMP/luxcam-tests" \
             Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/OrientationMath.java \
-            Camera2Diagnostico/checks/OrientationMathCheck.java
-          java -cp "$RUNNER_TEMP/luxcam-jvm" com.altoke.camera2diagnostico.LuxColorMathCheck
-          java -cp "$RUNNER_TEMP/luxcam-jvm" com.altoke.camera2diagnostico.OrientationMathCheck
+            Camera2Diagnostico/checks/OrientationMathCheck.java \
+            Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxColorMath.java \
+            Camera2Diagnostico/checks/LuxColorMathCheck.java
+          java -cp "$RUNNER_TEMP/luxcam-tests" com.altoke.camera2diagnostico.OrientationMathCheck
+          java -cp "$RUNNER_TEMP/luxcam-tests" com.altoke.camera2diagnostico.LuxColorMathCheck
 
       - name: Compilar APK
         working-directory: Camera2Diagnostico
@@ -78,7 +82,7 @@ jobs:
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
-          name: LuxCam-Pro-5.2.1-Seguro-APK
+          name: LuxCam-5.2.2-Sin-Espejo-APK
           path: Camera2Diagnostico/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
