@@ -29,7 +29,7 @@ jobs:
           gradle-version: '8.9'
 
       - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Instalar SDK Android
         run: sdkmanager --install "platforms;android-34" "build-tools;35.0.0"
