@@ -1,4 +1,4 @@
-name: Compilar LuxCam Studio 5.1.1
+name: Compilar LuxCam Studio 5.1.2 - cierre corregido
 
 on:
   push:
@@ -16,21 +16,21 @@ jobs:
       - name: Obtener repositorio
         uses: actions/checkout@v4
 
-      - name: Java 17
+      - name: Configurar Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Gradle 8.9
+      - name: Preparar Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Android SDK
+      - name: Configurar Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Instalar Android 34
+      - name: Instalar Android API 34
         run: sdkmanager --install 'platforms;android-34' 'build-tools;35.0.0'
 
       - name: Aplicar proyecto completo 5.1.1
@@ -38,16 +38,35 @@ jobs:
         run: |
           test -f LuxCam_Studio_v5_1_1_BUNDLE_COMPLETO_RAIZ_GITHUB.zip
           unzip -oq LuxCam_Studio_v5_1_1_BUNDLE_COMPLETO_RAIZ_GITHUB.zip -d .
-          test -f Camera2Diagnostico/settings.gradle
-          test -f Camera2Diagnostico/app/build.gradle
           test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxCamActivity.java
           test -f Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/OrientationMath.java
           test -f Camera2Diagnostico/checks/OrientationMathCheck.java
-          test -f Camera2Diagnostico/app/src/main/res/layout/activity_luxcam_studio.xml
-          test -f Camera2Diagnostico/app/src/main/res/layout-land/activity_luxcam_studio.xml
-          echo 'Proyecto completo y archivos de orientacion presentes.'
 
-      - name: Tests Java de orientacion
+      - name: Corregir crash TextureView en ambas orientaciones
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import xml.etree.ElementTree as ET
+
+          pattern = re.compile(r'(<TextureView\b[^>]*?)\s+android:background="[^"]*"([^>]*?/>)', re.S)
+          android_bg = '{http://schemas.android.com/apk/res/android}background'
+          for folder in ('layout', 'layout-land'):
+              p = Path('Camera2Diagnostico/app/src/main/res') / folder / 'activity_luxcam_studio.xml'
+              original = p.read_text(encoding='utf-8')
+              fixed, changed = pattern.subn(r'\1\2', original)
+              if changed != 1:
+                  raise SystemExit(f'Esperaba corregir 1 TextureView en {p}, encontre {changed}')
+              root = ET.fromstring(fixed)
+              views = [element for element in root.iter() if element.tag == 'TextureView']
+              if len(views) != 1 or android_bg in views[0].attrib:
+                  raise SystemExit(f'TextureView invalido en {p}')
+              p.write_text(fixed, encoding='utf-8')
+              print(f'OK: eliminado background incompatible de {p}')
+          PY
+
+      - name: Comprobar calculos de orientacion
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/luxcam-tests"
@@ -56,14 +75,14 @@ jobs:
             Camera2Diagnostico/checks/OrientationMathCheck.java
           java -cp "$RUNNER_TEMP/luxcam-tests" com.altoke.camera2diagnostico.OrientationMathCheck
 
-      - name: Compilar APK
+      - name: Compilar APK Android
         working-directory: Camera2Diagnostico
         run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
-          name: LuxCam-Studio-v5.1.1-APK
+          name: LuxCam-Studio-v5.1.2-APK
           path: Camera2Diagnostico/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
