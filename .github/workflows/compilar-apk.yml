@@ -1,4 +1,4 @@
-name: Compilar LuxCam Studio 5.1.2 - cierre corregido
+name: Compilar LuxCam Studio 5.1.3 - visor horizontal
 
 on:
   push:
@@ -66,6 +66,14 @@ jobs:
               print(f'OK: eliminado background incompatible de {p}')
           PY
 
+      - name: Reparar solo TextureView horizontal (5.1.3)
+        shell: bash
+        run: |
+          test -f LuxCam_Studio_v5_1_3_FIX_PREVIEW_GITHUB.zip
+          unzip -oq LuxCam_Studio_v5_1_3_FIX_PREVIEW_GITHUB.zip -d .
+          grep -q '5.1.3: On X678B' Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/LuxCamActivity.java
+          echo 'Transformacion horizontal aplicada. JPEG y MediaRecorder se mantienen intactos.'
+
       - name: Comprobar calculos de orientacion
         shell: bash
         run: |
@@ -82,7 +90,7 @@ jobs:
       - name: Publicar APK
         uses: actions/upload-artifact@v4
         with:
-          name: LuxCam-Studio-v5.1.2-APK
+          name: LuxCam-Studio-v5.1.3-APK
           path: Camera2Diagnostico/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
