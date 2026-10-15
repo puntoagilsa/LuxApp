@@ -1,10 +1,8 @@
-
-name: Compilar APK LuxCam Pro
+name: Compilar APK LuxCam Pro 4
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -14,7 +12,7 @@ jobs:
       contents: read
 
     steps:
-      - name: Obtener proyecto
+      - name: Obtener codigo del repositorio
         uses: actions/checkout@v4
 
       - name: Configurar Java 17
@@ -23,7 +21,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Preparar Gradle
+      - name: Configurar Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -31,20 +29,28 @@ jobs:
       - name: Configurar Android SDK
         uses: android-actions/setup-android@v4
 
-      - name: Instalar SDK Android
+      - name: Instalar API y build tools
         run: sdkmanager --install "platforms;android-34" "build-tools;35.0.0"
 
-      - name: Aplicar fuente LuxCam Pro v3
-        run: unzip -o LuxCam_Pro_v3_BUNDLE_PARA_REPOSITORIO.zip -d .
+      - name: Aplicar LuxCam 4 sobre fuente anterior
+        run: unzip -o LuxCam_Pro_v4_BUNDLE_RAIZ_GITHUB.zip -d .
 
-      - name: Compilar APK
+      - name: Probar calculos de orientacion
+        run: |
+          mkdir -p "$RUNNER_TEMP/luxmath"
+          javac -d "$RUNNER_TEMP/luxmath" \
+            Camera2Diagnostico/app/src/main/java/com/altoke/camera2diagnostico/OrientationMath.java \
+            Camera2Diagnostico/checks/OrientationMathCheck.java
+          java -cp "$RUNNER_TEMP/luxmath" com.altoke.camera2diagnostico.OrientationMathCheck
+
+      - name: Compilar APK Android 14
         working-directory: Camera2Diagnostico
-        run: gradle :app:assembleDebug --stacktrace
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
 
-      - name: Publicar APK
+      - name: Publicar archivo instalable
         uses: actions/upload-artifact@v4
         with:
-          name: LuxCam-Pro-v3-APK
+          name: LuxCam-Pro-v4-APK
           path: Camera2Diagnostico/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
